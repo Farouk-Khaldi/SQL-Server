@@ -1,0 +1,65 @@
+-- Analyse des performances de SQL Server
+
+-- Informations sur les performances du serveur
+SELECT 
+    SQLServerProcessID,
+    CreationTime,
+    PhysicalMemoryInUse_kb,
+    VirtualAddressSpaceReserved_kb,
+    VirtualAddressSpaceCommitted_kb,
+    TotalWorkerThreads,
+    ActiveWorkerThreads
+FROM sys.dm_os_process_memory
+
+-- Informations sur les bases de données
+SELECT 
+    DB_NAME(database_id) AS DatabaseName,
+    total_worker_time,
+    total_physical_reads,
+    total_logical_reads,
+    total_logical_writes,
+    total_elapsed_time
+FROM sys.dm_exec_query_stats AS qs
+CROSS APPLY sys.dm_exec_sql_text(qs.sql_handle) AS st
+INNER JOIN sys.dm_exec_requests AS r ON qs.sql_handle = r.sql_handle
+
+-- Informations sur les files d'attente
+SELECT
+    wait_type,
+    waiting_tasks_count,
+    wait_time_ms,
+    max_wait_time_ms
+FROM sys.dm_os_wait_stats
+WHERE wait_type NOT IN (
+    'BROKER_EVENTHANDLER',
+    'CLR_AUTO_EVENT',
+    'CLR_MANUAL_EVENT',
+    'LAZYWRITER_SLEEP',
+    'SLEEP_TASK',
+    'SLEEP_SYSTEMTASK',
+    'SQLTRACE_BUFFER_FLUSH',
+    'WAITFOR',
+    'LOGMGR_QUEUE',
+    'CHECKPOINT_QUEUE',
+    'REQUEST_FOR_DEADLOCK_SEARCH',
+    'XE_TIMER_EVENT',
+    'BROKER_TO_FLUSH',
+    'BROKER_TASK_STOP',
+    'CLR_MANUAL_EVENT',
+    'CLR_AUTO_EVENT'
+)
+ORDER BY wait_time_ms DESC
+
+-- Informations sur les index manquants
+SELECT
+    OBJECT_NAME(object_id) AS TableName,
+    dmv.equality_columns,
+    dmv.inequality_columns,
+    dmv.included_columns,
+    s.avg_user_impact,
+    s.user_seeks,
+    s.user_scans
+FROM sys.dm_db_missing_index_details AS dmv
+INNER JOIN sys.dm_db_missing_index_groups AS g ON dmv.index_handle = g.index_handle
+INNER JOIN sys.dm_db_missing_index_group_stats AS s ON g.index_group_handle = s.group_handle
+ORDER BY s.avg_user_impact DESC
