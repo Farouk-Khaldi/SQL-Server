@@ -1,0 +1,92 @@
+-- Vérification des meilleures pratiques pour SQL Server
+
+-- Informations sur la version SQL Server
+SELECT @@VERSION AS 'Version SQL Server'
+
+-- Configuration de base du serveur
+EXEC sp_configure 'show advanced options', 1
+RECONFIGURE
+EXEC sp_configure
+
+-- Espaces disques et fichiers de base de données
+EXEC xp_fixeddrives
+
+-- Vérification de l'utilisation de la mémoire
+SELECT
+    physical_memory_in_use_kb / 1024 AS 'Physical Memory (MB)',
+    sqlserver_start_time AS 'SQL Server Start Time',
+    getdate() AS 'Current Time',
+    datediff(mi, sqlserver_start_time, getdate()) AS 'Uptime (minutes)'
+FROM sys.dm_os_sys_info
+
+-- Utilisation de l'espace de la base de données
+SELECT
+    DB_NAME(database_id) AS 'Database',
+    size_on_disk_bytes / (1024 * 1024) AS 'Size on Disk (MB)',
+    CAST((size_on_disk_bytes * 1.0) / (max_size_bytes * 1.0) * 100 AS DECIMAL(5, 2)) AS 'Percent Used'
+FROM sys.master_files
+
+-- Statistiques sur les performances
+SELECT
+    total_worker_time,
+    total_logical_reads,
+    total_logical_writes,
+    total_physical_reads,
+    execution_count,
+    total_elapsed_time
+FROM sys.dm_exec_query_stats
+ORDER BY total_worker_time DESC
+
+-- Index manquants
+SELECT
+    d.name AS 'Database',
+    t.name AS 'Table',
+    s.name AS 'Schema',
+    'CREATE INDEX [IX_missing_' + t.name + '_' + c.name + '] ON ' + s.name + '.' + t.name + ' (' + c.name + ');' AS 'Create Index Statement'
+FROM sys.dm_db_missing_index_groups g
+JOIN sys.dm_db_missing_index_details d ON d.index_handle = g.index_handle
+JOIN sys.sysobjects t ON d.OBJECT_ID = t.id
+JOIN sys.schemas s ON t.uid = s.schema_id
+JOIN sys.columns c ON d.column_id = c.column_id AND t.id = c.id
+ORDER BY d.database_id, d.object_id
+
+-- Utilisation du cache de procédures stockées
+SELECT
+    DB_NAME(database_id) AS 'Database',
+    object_name(object_id) AS 'Procedure',
+    usecounts,
+    cached_time
+FROM sys.dm_exec_cached_plans
+WHERE cacheobjtype = 'Compiled Plan'
+ORDER BY usecounts DESC
+
+-- Utilisation des connexions
+SELECT
+    COUNT(session_id) AS 'Total Connections',
+    COUNT(DISTINCT host_name) AS 'Unique Hosts',
+    COUNT(DISTINCT program_name) AS 'Unique Applications'
+FROM sys.dm_exec_connections
+
+-- Comptes d'utilisateur avec des privilèges élevés
+SELECT
+    name AS 'Login',
+    type_desc AS 'Login Type'
+FROM sys.server_principals
+WHERE is_disabled = 0
+    AND IS_SRVROLEMEMBER('sysadmin', name) = 1
+
+-- Dernière sauvegarde de base de données
+SELECT
+    db.name AS 'Database',
+    MAX(bck.backup_finish_date) AS 'Last Backup Date'
+FROM sys.databases db
+LEFT JOIN msdb.dbo.backupset bck ON db.name = bck.database_name
+GROUP BY db.name
+
+-- Rôles de serveur et membres
+EXEC sp_helpsrvrolemember
+
+-- Statut des jobs SQL Server Agent
+USE msdb
+GO
+EXEC sp_help_job @execution_status = 1
