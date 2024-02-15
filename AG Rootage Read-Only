@@ -1,0 +1,30 @@
+--Step 1. Update the replicas to read-only
+
+ALTER AVAILABILITY GROUP [SQLAG1] MODIFY REPLICA ON N'WSFCNODE1' WITH (SECONDARY_ROLE (ALLOW_CONNECTIONS = READ_ONLY))
+GO
+ALTER AVAILABILITY GROUP [SQLAG1] MODIFY REPLICA ON N'WSFCNODE2' WITH (SECONDARY_ROLE (ALLOW_CONNECTIONS = READ_ONLY))
+GO
+
+--Step 2. Create the routing URL
+
+ALTER AVAILABILITY GROUP [SQLAG1] MODIFY REPLICA ON N'WSFCNODE1' WITH (SECONDARY_ROLE (READ_ONLY_ROUTING_URL = N'TCP://WSFCNode1.tagechtalk.com:1433'))
+GO
+ALTER AVAILABILITY GROUP [SQLAG1] MODIFY REPLICA ON N'WSFCNODE2' WITH (SECONDARY_ROLE (READ_ONLY_ROUTING_URL = N'TCP://WSFCNode2.tagechtalk.com:1433'))
+GO
+
+--Step 3. Create the routing list
+
+ALTER AVAILABILITY GROUP [SQLAG1] MODIFY REPLICA ON N'WSFCNODE1' WITH (PRIMARY_ROLE(READ_ONLY_ROUTING_LIST=('WSFCNODE2','WSFCNODE1')));
+GO
+ALTER AVAILABILITY GROUP [SQLAG1] MODIFY REPLICA ON N'WSFCNODE2' WITH (PRIMARY_ROLE (READ_ONLY_ROUTING_LIST=('WSFCNODE1','WSFCNODE2')));
+GO
+
+--Step 4. Validate the routing list
+
+SELECT AGSrc.replica_server_name AS PrimaryReplica, AGRepl.replica_server_name AS ReadOnlyReplica, AGRepl.read_only_routing_url AS RoutingURL , AGRL.routing_priority AS RoutingPriority
+FROM sys.availability_read_only_routing_lists AGRL INNER JOIN sys.availability_replicas AGSrc ON AGRL.replica_id = AGSrc.replica_id INNER JOIN sys.availability_replicas AGRepl ON AGRL.read_only_replica_id = AGRepl.replica_id INNER JOIN sys.availability_groups AV ON AV.group_id = AGSrc.group_id
+ORDER BY PrimaryReplica
+
+Step 5. SQL Command Utility
+
+sqlcmd -S SQLAG1,1433 -E -d test -K ReadOnly
