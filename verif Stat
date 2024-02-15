@@ -1,0 +1,12 @@
+select 
+	CONVERT(DATE, STATS_DATE(s.object_id, s.stats_id)) AS DateDay,
+    COUNT(*) AS 'number of statistics updates'
+FROM sys.stats AS s
+INNER JOIN sys.tables AS t ON s.object_id = t.object_id
+--where --s.is_temporary=1
+GROUP BY
+    CONVERT(DATE, STATS_DATE(s.object_id, s.stats_id))
+	order by DateDay desc
+select COUNT(*)
+	FROM sys.stats AS s
+INNER JOIN sys.tables AS t ON s.object_id = t.object_id
