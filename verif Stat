@@ -10,3 +10,21 @@ GROUP BY
 select COUNT(*)
 	FROM sys.stats AS s
 INNER JOIN sys.tables AS t ON s.object_id = t.object_id
+
+-------------
+
+SELECT
+    OBJECT_NAME(s.object_id) AS TableName,
+    s.name AS StatisticName,
+    STATS_DATE(s.object_id, s.stats_id) AS LastUpdate,
+	s.is_temporary,
+	s.auto_created,
+    s.user_created,
+    s.no_recompute,
+    s.is_incremental
+FROM sys.stats AS s
+INNER JOIN sys.tables AS t ON s.object_id = t.object_id
+--where --s.is_temporary=1
+--GROUP BY
+--   CONVERT(DATE, STATS_DATE(s.object_id, s.stats_id))
+ORDER BY LastUpdate desc, t.name, s.stats_id;
