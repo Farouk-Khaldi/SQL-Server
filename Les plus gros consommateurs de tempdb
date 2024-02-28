@@ -1,0 +1,49 @@
+SELECT ta.session_id
+,status
+,login_name
+,host_name
+,program_name
+,db_name
+,login_time
+,allocated_pages
+,total_alloc_page_count
+,total_dealloc_page_count
+,user_objects_alloc_page_count
+,user_objects_dealloc_page_count
+,internal_objects_alloc_page_count
+,internal_objects_dealloc_page_count
+,rq.text
+FROM ( SELECT ssp.session_id
+,se.status
+,se.login_name
+,se.host_name
+,se.program_name
+,DB_NAME(se.database_id) AS db_name
+,se.login_time
+,( SUM(ssp.user_objects_alloc_page_count + tsp.user_objects_alloc_page_count)
++ SUM(ssp.internal_objects_alloc_page_count + tsp.internal_objects_alloc_page_count) )
+- ( SUM(ssp.user_objects_dealloc_page_count + tsp.user_objects_dealloc_page_count)
++ SUM(ssp.internal_objects_dealloc_page_count + tsp.internal_objects_dealloc_page_count) ) AS allocated_pages
+,SUM(ssp.user_objects_alloc_page_count + tsp.user_objects_alloc_page_count)
++ SUM(ssp.internal_objects_alloc_page_count + tsp.internal_objects_alloc_page_count) AS total_alloc_page_count
+,SUM(ssp.user_objects_dealloc_page_count + tsp.user_objects_dealloc_page_count)
++ SUM(ssp.internal_objects_dealloc_page_count + tsp.internal_objects_dealloc_page_count) AS total_dealloc_page_count
+,SUM(ssp.user_objects_alloc_page_count + tsp.user_objects_alloc_page_count) AS user_objects_alloc_page_count
+,SUM(ssp.user_objects_dealloc_page_count + tsp.user_objects_dealloc_page_count) AS user_objects_dealloc_page_count
+,SUM(ssp.internal_objects_alloc_page_count + tsp.internal_objects_alloc_page_count) AS internal_objects_alloc_page_count
+,SUM(ssp.internal_objects_dealloc_page_count + tsp.internal_objects_dealloc_page_count) AS internal_objects_dealloc_page_count
+FROM sys.dm_db_session_space_usage ssp ( READUNCOMMITTED )
+JOIN sys.dm_db_task_space_usage tsp ( READUNCOMMITTED ) ON ssp.session_id = tsp.session_id
+JOIN sys.dm_exec_sessions se ( READUNCOMMITTED ) ON ssp.session_id = se.session_id
+GROUP BY ssp.session_id
+,se.status
+,se.login_name
+,se.host_name
+,se.program_name
+,DB_NAME(se.database_id)
+,se.login_time
+) AS ta
+LEFT JOIN sys.dm_exec_connections c ( READUNCOMMITTED ) ON ta.session_id = c.session_id
+OUTER APPLY sys.dm_exec_sql_text(c.most_recent_sql_handle) AS rq
+ORDER BY allocated_pages DESC
+,total_alloc_page_count DESC
