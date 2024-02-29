@@ -995,11 +995,6 @@ END
 SELECT *
 FROM @Alerts
 ORDER BY 1, 2, 3
-Farouk KHALDI
-DBA Team
-Bolloré Transport & Logistics
-Immeuble Optima,
-6-10 Rue Godefroy - 92800 - Puteaux – France
  
 
 
