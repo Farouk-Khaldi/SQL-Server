@@ -1,0 +1,5 @@
+SELECT DB_NAME(database_id) AS DatabaseName,sum((size*8)/1024/1024) AS SizeGb
+FROM sys.master_files
+where db_name(database_id) not in ('master','tempdb','model','msdb')
+group by database_id
+order by SizeGb DESC
